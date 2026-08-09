@@ -49,6 +49,7 @@ async def _ensure_phone(update: Update, user) -> bool:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.info("Received /start from user %s", update.effective_user.id if update.effective_user else "unknown")
     settings = get_settings()
     tg_user = update.effective_user
 
@@ -74,6 +75,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.info("Received /balance from user %s", update.effective_user.id if update.effective_user else "unknown")
     tg_user = update.effective_user
     db = SessionLocal()
     try:
@@ -84,6 +86,7 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.info("Received /help from user %s", update.effective_user.id if update.effective_user else "unknown")
     await update.message.reply_text(
         "/start — open ETFC Betting\n"
         "/balance — check your balance\n"
@@ -92,6 +95,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.info("Received contact from user %s", update.effective_user.id if update.effective_user else "unknown")
     contact = update.message.contact
     if not contact or not contact.phone_number:
         return
