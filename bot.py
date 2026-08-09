@@ -79,9 +79,6 @@ def build_application() -> Application:
         raise RuntimeError(
             "ETFC_TELEGRAM_BOT_TOKEN is not set — get one from @BotFather and put it in .env"
         )
-    # Ensure tables exist if the bot is started before the API has run once.
-    Base.metadata.create_all(bind=engine)
-
     application = Application.builder().token(settings.telegram_bot_token).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("balance", balance))
