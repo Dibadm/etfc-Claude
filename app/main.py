@@ -25,7 +25,7 @@ app = FastAPI(title="ETFC Betting Engine — Phase 1")
 # error before it even reaches FastAPI's routing.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_settings().cors_allow_origins,
+    allow_origins=[o.strip() for o in get_settings().cors_allow_origins.split(",") if o.strip()],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
