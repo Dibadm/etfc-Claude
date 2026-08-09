@@ -19,3 +19,19 @@ services:
         value: "false"
       - key: ETFC_LICENSE_NUMBER
         sync: false
+
+  - type: static
+    name: etfc-miniapp
+    buildCommand: cd miniapp && npm install && npm run build
+    staticPublishPath: ./miniapp/dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+
+  - type: static
+    name: etfc-admin
+    buildCommand: cd admin && npm install && npm run build
+    staticPublishPath: ./admin/dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
