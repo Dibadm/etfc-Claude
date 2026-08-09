@@ -86,6 +86,11 @@ export const adminApi = {
   rejectDepositReview: (reviewId, reason) =>
     request(`/admin/deposit-reviews/${reviewId}/reject`, { method: "POST", body: { reason } }),
 
+  jackpotRounds: () => request("/jackpot/rounds"),
+  createJackpotRound: (payload) => request("/admin/jackpot/rounds", { method: "POST", body: payload }),
+  settleJackpotRound: (roundId) => request(`/admin/jackpot/rounds/${roundId}/settle`, { method: "POST" }),
+  jackpotEntries: (roundId) => request(`/admin/jackpot/rounds/${roundId}/entries`),
+
   status: () => request("/status"),
 };
 

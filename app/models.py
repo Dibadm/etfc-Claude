@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -47,23 +48,23 @@ class VictoryMethod(str, enum.Enum):
 
 
 class MarketType(str, enum.Enum):
-    MONEYLINE = "moneyline"                 # who wins the fight
-    METHOD_OF_VICTORY = "method_of_victory"  # KO/TKO, submission, decision
-    ROUND_PROP = "round_prop"                # which round it ends in / distance
+    MONEYLINE = "moneyline"
+    METHOD_OF_VICTORY = "method_of_victory"
+    ROUND_PROP = "round_prop"
 
 
 class MarketStatus(str, enum.Enum):
     OPEN = "open"
-    SUSPENDED = "suspended"   # temporarily not accepting bets, e.g. news breaks
+    SUSPENDED = "suspended"
     SETTLED = "settled"
-    VOID = "void"             # fight cancelled etc. — all bets refunded
+    VOID = "void"
 
 
 class BetStatus(str, enum.Enum):
     PENDING = "pending"
     WON = "won"
     LOST = "lost"
-    VOID = "void"       # market voided -> stake refunded
+    VOID = "void"
     REFUNDED = "refunded"
 
 
@@ -71,14 +72,14 @@ class ParlayStatus(str, enum.Enum):
     PENDING = "pending"
     WON = "won"
     LOST = "lost"
-    VOID = "void"        # every leg voided -> stake refunded, not a win
+    VOID = "void"
 
 
 class ParlayLegStatus(str, enum.Enum):
     PENDING = "pending"
     WON = "won"
     LOST = "lost"
-    VOID = "void"         # that leg's fight was cancelled — excluded from payout math, doesn't sink the ticket
+    VOID = "void"
 
 
 class TransactionType(str, enum.Enum):
@@ -88,12 +89,20 @@ class TransactionType(str, enum.Enum):
     BET_HOLD = "bet_hold"
     BET_PAYOUT = "bet_payout"
     BET_REFUND = "bet_refund"
+    JACKPOT_ENTRY = "jackpot_entry"
 
 
 class DepositReviewStatus(str, enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
+
+
+class JackpotStatus(str, enum.Enum):
+    OPEN = "open"
+    LOCKED = "locked"
+    SETTLED = "settled"
+    CANCELLED = "cancelled"
 
 
 # --------------------------------------------------------------------------
@@ -123,7 +132,7 @@ class Wallet(Base):
     currency = Column(String, nullable=False, default="ETB")
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
-    user = relationship("User", back_populates="wallet")
+    user = relationship("Wallet", back_populates="user")
     transactions = relationship("WalletTransaction", back_populates="wallet")
 
 
@@ -134,25 +143,15 @@ class WalletTransaction(Base):
     id = Column(String, primary_key=True, default=_uuid)
     wallet_id = Column(String, ForeignKey("wallets.id"), nullable=False)
     type = Column(Enum(TransactionType), nullable=False)
-    amount = Column(Numeric(14, 2), nullable=False)          # signed: + credit, - debit
+    amount = Column(Numeric(14, 2), nullable=False)
     balance_after = Column(Numeric(14, 2), nullable=False)
-    reference = Column(String, nullable=True)                 # e.g. bet id, deposit ref
+    reference = Column(String, nullable=True)
     idempotency_key = Column(String, nullable=True, unique=True)
     created_at = Column(DateTime(timezone=True), default=_now)
 
     wallet = relationship("Wallet", back_populates="transactions")
 
     __table_args__ = (
-        # Guards the exact race deposit_service.reference_already_used()'s
-        # plain SELECT check can't close on its own: two concurrent
-        # submissions of the same Telebirr SMS could both pass that check
-        # before either commits, on Postgres. This is the actual backstop;
-        # the application-level check just gives a friendlier error first.
-        # Scoped to deposits only — `reference` isn't meant to be globally
-        # unique (every user's demo-credit row shares the literal string
-        # "signup_demo_seed"; a single bet's hold/payout/refund rows all
-        # share that bet's id as their reference, across three DIFFERENT
-        # types).
         Index(
             "uq_wallet_transactions_deposit_reference",
             "reference",
@@ -180,7 +179,7 @@ class Fight(Base):
     __tablename__ = "fights"
 
     id = Column(String, primary_key=True, default=_uuid)
-    event_name = Column(String, nullable=False)      # e.g. "ETFC 11"
+    event_name = Column(String, nullable=False)
     weight_class = Column(String, nullable=True)
     fighter_a_id = Column(String, ForeignKey("fighters.id"), nullable=False)
     fighter_b_id = Column(String, ForeignKey("fighters.id"), nullable=False)
@@ -188,10 +187,9 @@ class Fight(Base):
     status = Column(Enum(FightStatus), nullable=False, default=FightStatus.SCHEDULED)
     is_main_event = Column(Boolean, nullable=False, default=False)
 
-    # Result fields — populated only at settlement time.
     winner_fighter_id = Column(String, ForeignKey("fighters.id"), nullable=True)
     result_method = Column(Enum(VictoryMethod), nullable=True)
-    result_round = Column(Integer, nullable=True)   # 1, 2, 3... null if decision
+    result_round = Column(Integer, nullable=True)
 
     fighter_a = relationship("Fighter", foreign_keys=[fighter_a_id])
     fighter_b = relationship("Fighter", foreign_keys=[fighter_b_id])
@@ -221,30 +219,18 @@ class Market(Base):
 
 
 class MarketOutcome(Base):
-    """
-    A single selectable outcome within a market, with its current price.
-
-    Odds are stored in DECIMAL format (e.g. 2.50 means a 10 ETB stake
-    returns 25 ETB total if it wins, i.e. potential_payout = stake * odds).
-    Decimal odds are used because the payout math is a single
-    multiplication — simplest to get right for a from-scratch engine,
-    and it's the format most bettors outside the US already read.
-    """
     __tablename__ = "market_outcomes"
 
     id = Column(String, primary_key=True, default=_uuid)
     market_id = Column(String, ForeignKey("markets.id"), nullable=False)
-    label = Column(String, nullable=False)   # "Fighter A", "KO/TKO", "Round 2", "Goes the Distance"
+    label = Column(String, nullable=False)
     odds = Column(Numeric(6, 2), nullable=False)
 
-    # Settlement-matching keys — how we figure out which outcome(s) won
-    # without parsing free-text labels. Exactly the relevant one(s) are
-    # set per market_type; the rest stay null.
-    fighter_id = Column(String, ForeignKey("fighters.id"), nullable=True)       # moneyline
-    victory_method = Column(Enum(VictoryMethod), nullable=True)                  # method_of_victory
-    round_number = Column(Integer, nullable=True)                                # round_prop (null = "goes the distance")
+    fighter_id = Column(String, ForeignKey("fighters.id"), nullable=True)
+    victory_method = Column(Enum(VictoryMethod), nullable=True)
+    round_number = Column(Integer, nullable=True)
 
-    is_winning_outcome = Column(Boolean, nullable=True)  # set at settlement
+    is_winning_outcome = Column(Boolean, nullable=True)
 
     market = relationship("Market", back_populates="outcomes")
 
@@ -262,8 +248,8 @@ class Bet(Base):
     outcome_id = Column(String, ForeignKey("market_outcomes.id"), nullable=False)
 
     stake = Column(Numeric(14, 2), nullable=False)
-    odds_at_placement = Column(Numeric(6, 2), nullable=False)   # snapshot, immune to later odds moves
-    potential_payout = Column(Numeric(14, 2), nullable=False)   # stake * odds_at_placement
+    odds_at_placement = Column(Numeric(6, 2), nullable=False)
+    potential_payout = Column(Numeric(14, 2), nullable=False)
 
     status = Column(Enum(BetStatus), nullable=False, default=BetStatus.PENDING)
     placed_at = Column(DateTime(timezone=True), default=_now)
@@ -275,11 +261,7 @@ class Bet(Base):
 
 
 # --------------------------------------------------------------------------
-# Parlays (multi-fight tickets) — a single wager combining selections from
-# several DIFFERENT fights. All legs must win for the ticket to pay out;
-# combined odds are the product of each leg's odds. See
-# app/services/parlay_service.py for placement and settlement_service.py
-# for how legs resolve as their individual fights get settled.
+# Parlays
 # --------------------------------------------------------------------------
 
 class Parlay(Base):
@@ -289,10 +271,6 @@ class Parlay(Base):
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
 
     stake = Column(Numeric(14, 2), nullable=False)
-    # Product of every leg's odds at placement — the full potential payout
-    # multiplier if every leg wins. Used for display/liability; the actual
-    # settlement payout is recomputed from won legs only if any leg voids
-    # (a voided leg is excluded, not treated as a loss — see settlement_service).
     combined_odds = Column(Numeric(12, 4), nullable=False)
     potential_payout = Column(Numeric(14, 2), nullable=False)
 
@@ -311,9 +289,6 @@ class ParlayLeg(Base):
     parlay_id = Column(String, ForeignKey("parlays.id"), nullable=False)
     market_id = Column(String, ForeignKey("markets.id"), nullable=False)
     outcome_id = Column(String, ForeignKey("market_outcomes.id"), nullable=False)
-    # Denormalized from market.fight_id — settlement needs to find "every
-    # pending leg touching this fight" by fight id, on every fight
-    # settlement, so storing it directly avoids a join for that lookup.
     fight_id = Column(String, ForeignKey("fights.id"), nullable=False)
 
     odds_at_placement = Column(Numeric(6, 2), nullable=False)
@@ -326,15 +301,10 @@ class ParlayLeg(Base):
 
 
 # --------------------------------------------------------------------------
-# Telebirr deposit accounts (rotating receiving numbers)
+# Telebirr deposit accounts
 # --------------------------------------------------------------------------
 
 class DepositAccount(Base):
-    """A Telebirr phone number that can receive user deposits. Only one is
-    `active` at a time — that's the number shown to users. Deposits rotate
-    round-robin to the next account after `ETFC_ROTATE_AFTER_DEPOSITS`
-    successful deposits on the current one (ported from Habesha Bet's
-    same pattern — see app/services/telebirr_verify.py)."""
     __tablename__ = "deposit_accounts"
 
     id = Column(String, primary_key=True, default=_uuid)
@@ -346,8 +316,6 @@ class DepositAccount(Base):
 
 
 class DepositReview(Base):
-    """A deposit that failed automatic online verification and needs
-    manual admin review before the wallet is credited."""
     __tablename__ = "deposit_reviews"
 
     id = Column(String, primary_key=True, default=_uuid)
@@ -362,3 +330,55 @@ class DepositReview(Base):
     reviewer_token = Column(String, nullable=True)
 
     user = relationship("User")
+
+
+# --------------------------------------------------------------------------
+# Jackpot pool
+# --------------------------------------------------------------------------
+
+class JackpotRound(Base):
+    """A fixed-pool jackpot tied to a card of 11 fights."""
+    __tablename__ = "jackpot_rounds"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    name = Column(String, nullable=False)  # e.g. "ETFC Aug 27"
+    fight_ids = Column(JSON, nullable=False)  # ordered list of 11 fight IDs
+    entry_fee = Column(Numeric(14, 2), nullable=False, default=Decimal("30.00"))
+    prize_pool = Column(Numeric(14, 2), nullable=False, default=Decimal("1000000.00"))
+    min_correct_to_win = Column(Integer, nullable=False, default=10)
+    deadline = Column(DateTime(timezone=True), nullable=False)
+    status = Column(Enum(JackpotStatus), nullable=False, default=JackpotStatus.OPEN)
+    settled_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+
+class JackpotEntry(Base):
+    """A user's entry into a jackpot round."""
+    __tablename__ = "jackpot_entries"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    round_id = Column(String, ForeignKey("jackpot_rounds.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    correct_count = Column(Integer, nullable=False, default=0)
+    won = Column(Boolean, nullable=False, default=False)
+    payout = Column(Numeric(14, 2), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+    round = relationship("JackpotRound")
+    user = relationship("User")
+    picks = relationship("JackpotPick", back_populates="entry", cascade="all, delete-orphan")
+
+
+class JackpotPick(Base):
+    """One of the 11 picks within an entry."""
+    __tablename__ = "jackpot_picks"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    entry_id = Column(String, ForeignKey("jackpot_entries.id"), nullable=False)
+    fight_id = Column(String, ForeignKey("fights.id"), nullable=False)
+    picked_winner_id = Column(String, ForeignKey("fighters.id"), nullable=False)
+    is_correct = Column(Boolean, nullable=True)
+
+    entry = relationship("JackpotEntry", back_populates="picks")
+    fight = relationship("Fight")
+    picked_winner = relationship("Fighter", foreign_keys=[picked_winner_id])

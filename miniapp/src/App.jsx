@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Swords, Wallet as WalletIcon, ListChecks } from "lucide-react";
+import { Swords, Wallet as WalletIcon, ListChecks, Trophy } from "lucide-react";
 import { api } from "./api";
 import FightList from "./components/FightList";
 import FightDetail from "./components/FightDetail";
@@ -7,12 +7,14 @@ import BetSlip from "./components/BetSlip";
 import SlipBar from "./components/SlipBar";
 import WalletView from "./components/WalletView";
 import MyBets from "./components/MyBets";
+import Jackpot from "./components/Jackpot";
 import Logo from "./components/Logo";
 
 const TABS = [
   { id: "fights", label: "Fights", icon: Swords },
   { id: "wallet", label: "Wallet", icon: WalletIcon },
   { id: "bets", label: "My Bets", icon: ListChecks },
+  { id: "jackpot", label: "Jackpot", icon: Trophy },
 ];
 
 export default function App() {
@@ -128,6 +130,7 @@ export default function App() {
         )}
         {activeTab === "wallet" && <WalletView me={me} status={status} onRefreshMe={refreshMe} />}
         {activeTab === "bets" && <MyBets bets={myBets} parlays={myParlays} />}
+        {activeTab === "jackpot" && <Jackpot />}
       </main>
 
       {slipLegs.length > 0 && !slipOpen && (

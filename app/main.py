@@ -12,7 +12,7 @@ from app import models, schemas
 from app.admin_auth import require_admin
 from app.config import get_settings
 from app.database import Base, engine, get_db
-from app.services import betting_service, deposit_service, odds_service, parlay_service, settlement_service, wallet_service
+from app.services import betting_service, deposit_service, jackpot_service, odds_service, parlay_service, settlement_service, wallet_service
 from app.services.rate_limiter import RateLimiter, get_client_ip
 from app.telegram_auth import TelegramUser, get_telegram_user
 
@@ -673,6 +673,216 @@ def admin_reject_deposit_review(
         reviewed_at=review.reviewed_at,
         reviewer_token=review.reviewer_token,
     )
+
+
+# --- Jackpot pool -----------------------------------------------------------
+#
+# A fixed-pool game tied to a card of 11 fights. Users pay an entry fee
+# (default 30 ETB), pick one winner per fight, and anyone with 10+ correct
+# shares the prize pool (default 1M ETB). Picks lock at the deadline
+# (default: earliest fight scheduled_at). Settlement runs once after all
+# 11 fights are marked completed.
+
+@app.get("/jackpot/rounds", response_model=list[schemas.JackpotRoundOut])
+def list_jackpot_rounds(db: Session = Depends(get_db)):
+    rounds = jackpot_service.list_rounds(db)
+    return [
+        schemas.JackpotRoundOut(
+            id=r.id,
+            name=r.name,
+            fight_ids=r.fight_ids,
+            entry_fee=r.entry_fee,
+            prize_pool=r.prize_pool,
+            min_correct_to_win=r.min_correct_to_win,
+            deadline=r.deadline,
+            status=r.status.value,
+            settled_at=r.settled_at,
+            created_at=r.created_at,
+        )
+        for r in rounds
+    ]
+
+
+@app.get("/jackpot/rounds/{round_id}", response_model=schemas.JackpotRoundOut)
+def get_jackpot_round(round_id: str, db: Session = Depends(get_db)):
+    r = jackpot_service.get_round(db, round_id)
+    return schemas.JackpotRoundOut(
+        id=r.id,
+        name=r.name,
+        fight_ids=r.fight_ids,
+        entry_fee=r.entry_fee,
+        prize_pool=r.prize_pool,
+        min_correct_to_win=r.min_correct_to_win,
+        deadline=r.deadline,
+        status=r.status.value,
+        settled_at=r.settled_at,
+        created_at=r.created_at,
+    )
+
+
+@app.post("/miniapp/jackpot/entries", response_model=schemas.JackpotEntryOut)
+def miniapp_create_jackpot_entry(
+    payload: schemas.JackpotEntrySubmit,
+    tg_user: TelegramUser = Depends(get_telegram_user),
+    db: Session = Depends(get_db),
+):
+    user = wallet_service.get_or_create_user_by_telegram_id(db, tg_user.telegram_id, tg_user.username)
+    try:
+        entry = jackpot_service.submit_entry(db, user.id, payload.round_id, payload.picks)
+    except jackpot_service.RoundNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except jackpot_service.RoundNotOpenError as e:
+        raise HTTPException(409, str(e))
+    except jackpot_service.MissingPicksError as e:
+        raise HTTPException(400, str(e))
+    except jackpot_service.DuplicateEntryError as e:
+        raise HTTPException(409, str(e))
+    except wallet_service.InsufficientFundsError:
+        raise HTTPException(402, "Insufficient balance for jackpot entry fee.")
+
+    picks_out = [
+        schemas.JackpotPickOut(
+            id=p.id,
+            fight_id=p.fight_id,
+            picked_winner_id=p.picked_winner_id,
+            is_correct=p.is_correct,
+        )
+        for p in entry.picks
+    ]
+    return schemas.JackpotEntryOut(
+        id=entry.id,
+        round_id=entry.round_id,
+        user_id=entry.user_id,
+        correct_count=entry.correct_count,
+        won=entry.won,
+        payout=entry.payout,
+        created_at=entry.created_at,
+        picks=picks_out,
+    )
+
+
+@app.get("/miniapp/jackpot/entries/me", response_model=list[schemas.JackpotEntryOut])
+def miniapp_list_my_jackpot_entries(
+    tg_user: TelegramUser = Depends(get_telegram_user),
+    db: Session = Depends(get_db),
+):
+    user = wallet_service.get_or_create_user_by_telegram_id(db, tg_user.telegram_id, tg_user.username)
+    entries = db.query(JackpotEntry).filter(JackpotEntry.user_id == user.id).all()
+    result = []
+    for entry in entries:
+        picks_out = [
+            schemas.JackpotPickOut(
+                id=p.id,
+                fight_id=p.fight_id,
+                picked_winner_id=p.picked_winner_id,
+                is_correct=p.is_correct,
+            )
+            for p in entry.picks
+        ]
+        result.append(
+            schemas.JackpotEntryOut(
+                id=entry.id,
+                round_id=entry.round_id,
+                user_id=entry.user_id,
+                correct_count=entry.correct_count,
+                won=entry.won,
+                payout=entry.payout,
+                created_at=entry.created_at,
+                picks=picks_out,
+            )
+        )
+    return result
+
+
+# --- Admin: jackpot management ----------------------------------------------
+
+@app.post("/admin/jackpot/rounds", response_model=schemas.JackpotRoundOut)
+def admin_create_jackpot_round(
+    payload: schemas.JackpotRoundCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    try:
+        round_ = jackpot_service.create_round(
+            db,
+            name=payload.name,
+            fight_ids=payload.fight_ids,
+            entry_fee=payload.entry_fee,
+            prize_pool=payload.prize_pool,
+            min_correct_to_win=payload.min_correct_to_win,
+            deadline=payload.deadline,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return schemas.JackpotRoundOut(
+        id=round_.id,
+        name=round_.name,
+        fight_ids=round_.fight_ids,
+        entry_fee=round_.entry_fee,
+        prize_pool=round_.prize_pool,
+        min_correct_to_win=round_.min_correct_to_win,
+        deadline=round_.deadline,
+        status=round_.status.value,
+        settled_at=round_.settled_at,
+        created_at=round_.created_at,
+    )
+
+
+@app.post("/admin/jackpot/rounds/{round_id}/settle", response_model=schemas.JackpotRoundOut)
+def admin_settle_jackpot_round(
+    round_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    try:
+        round_ = jackpot_service.settle_round(db, round_id)
+    except (jackpot_service.RoundNotFoundError, jackpot_service.RoundAlreadySettledError, jackpot_service.RoundNotOpenError) as e:
+        raise HTTPException(400, str(e))
+    return schemas.JackpotRoundOut(
+        id=round_.id,
+        name=round_.name,
+        fight_ids=round_.fight_ids,
+        entry_fee=round_.entry_fee,
+        prize_pool=round_.prize_pool,
+        min_correct_to_win=round_.min_correct_to_win,
+        deadline=round_.deadline,
+        status=round_.status.value,
+        settled_at=round_.settled_at,
+        created_at=round_.created_at,
+    )
+
+
+@app.get("/admin/jackpot/rounds/{round_id}/entries", response_model=list[schemas.JackpotEntryOut])
+def admin_list_jackpot_entries(round_id: str, db: Session = Depends(get_db), _: None = Depends(require_admin)):
+    try:
+        jackpot_service.get_round(db, round_id)
+    except jackpot_service.RoundNotFoundError as e:
+        raise HTTPException(404, str(e))
+    entries = jackpot_service.list_entries(db, round_id)
+    result = []
+    for entry in entries:
+        picks_out = [
+            schemas.JackpotPickOut(
+                id=p.id,
+                fight_id=p.fight_id,
+                picked_winner_id=p.picked_winner_id,
+                is_correct=p.is_correct,
+            )
+            for p in entry.picks
+        ]
+        result.append(
+            schemas.JackpotEntryOut(
+                id=entry.id,
+                round_id=entry.round_id,
+                user_id=entry.user_id,
+                correct_count=entry.correct_count,
+                won=entry.won,
+                payout=entry.payout,
+                created_at=entry.created_at,
+                picks=picks_out,
+            )
+        )
+    return result
 
 
 # --- Frontend SPA serving ---------------------------------------------------

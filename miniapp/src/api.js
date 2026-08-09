@@ -51,6 +51,10 @@ export const api = {
       method: "POST",
       body: { sms_text: smsText, expected_amount: expectedAmount, idempotency_key: idempotencyKey },
     }),
+  jackpotRounds: () => request("/jackpot/rounds", { auth: false }),
+  submitJackpotEntry: (roundId, picks) =>
+    request("/miniapp/jackpot/entries", { method: "POST", body: { round_id: roundId, picks } }),
+  myJackpotEntries: () => request("/miniapp/jackpot/entries/me"),
 };
 
 export { ApiError };

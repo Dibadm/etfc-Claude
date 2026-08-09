@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.models import BetStatus, FightStatus, MarketStatus, MarketType, ParlayLegStatus, ParlayStatus, VictoryMethod
+from app.models import BetStatus, FightStatus, JackpotStatus, MarketStatus, MarketType, ParlayLegStatus, ParlayStatus, VictoryMethod
 
 MIN_DECIMAL_ODDS = Decimal("1.01")
 
@@ -275,3 +275,51 @@ class ParlayOut(BaseModel):
     potential_payout: Decimal
     status: ParlayStatus
     legs: list[ParlayLegOut]
+
+
+class JackpotRoundOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    fight_ids: list[str]
+    entry_fee: Decimal
+    prize_pool: Decimal
+    min_correct_to_win: int
+    deadline: datetime
+    status: str
+    settled_at: datetime | None
+    created_at: datetime
+
+
+class JackpotRoundCreate(BaseModel):
+    name: str
+    fight_ids: list[str]
+    entry_fee: Decimal = Decimal("30.00")
+    prize_pool: Decimal = Decimal("1000000.00")
+    min_correct_to_win: int = 10
+    deadline: datetime
+
+
+class JackpotPickOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    fight_id: str
+    picked_winner_id: str
+    is_correct: bool | None
+
+
+class JackpotEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    round_id: str
+    user_id: str
+    correct_count: int
+    won: bool
+    payout: Decimal | None
+    created_at: datetime
+    picks: list[JackpotPickOut]
+
+
+class JackpotEntrySubmit(BaseModel):
+    round_id: str
+    picks: dict[str, str]  # fight_id -> picked_winner_id
