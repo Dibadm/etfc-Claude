@@ -34,7 +34,7 @@ def _mini_app_keyboard(settings) -> InlineKeyboardMarkup:
 
 def _contact_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        [[KeyboardButton("Share your phone number", request_contact=True)]]
+        [[InlineKeyboardButton("Share your phone number", request_contact=True)]]
     )
 
 
