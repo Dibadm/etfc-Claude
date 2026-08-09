@@ -35,7 +35,7 @@ Thumbs.db
 *.swo
 
 # Render
-render.yaml
+# render.yaml
 
 # Misc
 *.log
