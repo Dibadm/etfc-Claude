@@ -6,9 +6,7 @@ services:
     startCommand: bash start.sh
     envVars:
       - key: ETFC_DATABASE_URL
-        fromDatabase:
-          name: etfc-db
-          property: connectionString
+        value: postgresql://neondb_owner:npg_d8H1NUYpmPyJ@ep-flat-mode-ayzx7ovz-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - key: ETFC_TELEGRAM_BOT_TOKEN
         sync: false
       - key: ETFC_MINI_APP_URL
@@ -21,9 +19,3 @@ services:
         value: "false"
       - key: ETFC_LICENSE_NUMBER
         sync: false
-
-databases:
-  - name: etfc-db
-    plan: free
-    databaseName: etfc_betting
-    user: etfc
