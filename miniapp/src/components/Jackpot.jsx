@@ -82,7 +82,7 @@ export default function Jackpot() {
           <div className="form-card__title">{selectedRound.name}</div>
           <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: "var(--space-3)" }}>
             Entry fee: {selectedRound.entry_fee} ETB · Prize pool: {selectedRound.prize_pool.toLocaleString()} ETB ·
-            Pick {selectedRound.min_correct_to_win}+ of 11 to win
+            Pick {selectedRound.min_correct_to_win}+ of {selectedRound.fight_ids.length} to win
           </div>
 
           {roundStatus === "settled" && (
@@ -92,7 +92,7 @@ export default function Jackpot() {
                 .filter((e) => e.round_id === selectedRound.id)
                 .map((e) => (
                   <div key={e.id} style={{ marginTop: "var(--space-2)" }}>
-                    You got {e.correct_count}/11 correct · {e.won ? `Won ${e.payout?.toLocaleString()} ETB` : "Better luck next time"}
+                    You got {e.correct_count}/{selectedRound.fight_ids.length} correct · {e.won ? `Won ${e.payout?.toLocaleString()} ETB` : "Better luck next time"}
                   </div>
                 ))}
             </div>

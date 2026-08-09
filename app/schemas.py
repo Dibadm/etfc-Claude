@@ -296,7 +296,7 @@ class JackpotRoundCreate(BaseModel):
     fight_ids: list[str]
     entry_fee: Decimal = Decimal("30.00")
     prize_pool: Decimal = Decimal("1000000.00")
-    min_correct_to_win: int = 10
+    min_correct_to_win: int = 9
     deadline: datetime
 
 

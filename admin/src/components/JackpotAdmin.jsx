@@ -11,7 +11,7 @@ export default function JackpotAdmin() {
     fight_ids: "",
     entry_fee: "30",
     prize_pool: "1000000",
-    min_correct_to_win: "10",
+    min_correct_to_win: "9",
     deadline: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -39,8 +39,8 @@ export default function JackpotAdmin() {
     setError(null);
     try {
       const fightIds = form.fight_ids.split(",").map((s) => s.trim()).filter(Boolean);
-      if (fightIds.length !== 11) {
-        throw new Error("You must provide exactly 11 fight IDs, comma-separated.");
+      if (fightIds.length !== 10) {
+        throw new Error("You must provide exactly 10 fight IDs, comma-separated.");
       }
       await adminApi.createJackpotRound({
         name: form.name,
@@ -51,7 +51,7 @@ export default function JackpotAdmin() {
         deadline: new Date(form.deadline).toISOString(),
       });
       setShowForm(false);
-      setForm({ name: "", fight_ids: "", entry_fee: "30", prize_pool: "1000000", min_correct_to_win: "10", deadline: "" });
+      setForm({ name: "", fight_ids: "", entry_fee: "30", prize_pool: "1000000", min_correct_to_win: "9", deadline: "" });
       load();
     } catch (e) {
       setError(e.message);
@@ -110,7 +110,7 @@ export default function JackpotAdmin() {
             />
           </div>
           <div style={{ marginBottom: "var(--space-2)" }}>
-            <label style={{ fontSize: 13, fontWeight: 600 }}>Fight IDs (comma-separated, exactly 11)</label>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Fight IDs (comma-separated, exactly 10)</label>
             <input
               required
               value={form.fight_ids}
@@ -148,7 +148,7 @@ export default function JackpotAdmin() {
                 type="number"
                 required
                 min={1}
-                max={11}
+                max={10}
                 value={form.min_correct_to_win}
                 onChange={(e) => setForm({ ...form, min_correct_to_win: e.target.value })}
                 style={{ width: "100%", marginTop: 4, padding: "8px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)" }}
@@ -180,7 +180,7 @@ export default function JackpotAdmin() {
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
               {entries.map((e) => (
                 <div key={e.id} style={{ fontSize: 13, padding: "6px 0", borderBottom: "1px solid var(--color-border)" }}>
-                  User {e.user_id.slice(0, 8)} — {e.correct_count}/11 correct — {e.won ? `Won ${e.payout?.toLocaleString()} ETB` : "Not a winner"}
+                  User {e.user_id.slice(0, 8)} — {e.correct_count}/{selectedRound.fight_ids.length} correct — {e.won ? `Won ${e.payout?.toLocaleString()} ETB` : "Not a winner"}
                 </div>
               ))}
             </div>

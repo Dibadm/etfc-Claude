@@ -338,15 +338,15 @@ class DepositReview(Base):
 # --------------------------------------------------------------------------
 
 class JackpotRound(Base):
-    """A fixed-pool jackpot tied to a card of 11 fights."""
+    """A fixed-pool jackpot tied to a card of 10 fights."""
     __tablename__ = "jackpot_rounds"
 
     id = Column(String, primary_key=True, default=_uuid)
     name = Column(String, nullable=False)  # e.g. "ETFC Aug 27"
-    fight_ids = Column(JSON, nullable=False)  # ordered list of 11 fight IDs
+    fight_ids = Column(JSON, nullable=False)  # ordered list of 10 fight IDs
     entry_fee = Column(Numeric(14, 2), nullable=False, default=Decimal("30.00"))
     prize_pool = Column(Numeric(14, 2), nullable=False, default=Decimal("1000000.00"))
-    min_correct_to_win = Column(Integer, nullable=False, default=10)
+    min_correct_to_win = Column(Integer, nullable=False, default=9)
     deadline = Column(DateTime(timezone=True), nullable=False)
     status = Column(Enum(JackpotStatus), nullable=False, default=JackpotStatus.OPEN)
     settled_at = Column(DateTime(timezone=True), nullable=True)
