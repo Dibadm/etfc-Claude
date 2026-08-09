@@ -133,7 +133,7 @@ class Wallet(Base):
     currency = Column(String, nullable=False, default="ETB")
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
-    user = relationship("Wallet", back_populates="user")
+    user = relationship("User", back_populates="wallet")
     transactions = relationship("WalletTransaction", back_populates="wallet")
 
 
