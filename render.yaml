@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: etfc-api
+    name: etfc-app
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: bash start.sh
     envVars:
       - key: ETFC_DATABASE_URL
         fromDatabase:
@@ -16,25 +16,6 @@ services:
       - key: ETFC_CORS_ALLOW_ORIGINS
         sync: false
       - key: ETFC_ADMIN_TOKEN
-        sync: false
-      - key: ETFC_WAGERING_ENABLED
-        value: "false"
-      - key: ETFC_LICENSE_NUMBER
-        sync: false
-
-  - type: worker
-    name: etfc-bot
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
-    envVars:
-      - key: ETFC_DATABASE_URL
-        fromDatabase:
-          name: etfc-db
-          property: connectionString
-      - key: ETFC_TELEGRAM_BOT_TOKEN
-        sync: false
-      - key: ETFC_MINI_APP_URL
         sync: false
       - key: ETFC_WAGERING_ENABLED
         value: "false"
