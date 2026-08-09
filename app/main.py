@@ -1,8 +1,10 @@
 from decimal import Decimal
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -579,3 +581,36 @@ def admin_activate_deposit_account(account_id: str, db: Session = Depends(get_db
         return deposit_service.set_deposit_account_active(db, account_id, True)
     except deposit_service.DepositAccountNotFoundError as e:
         raise HTTPException(404, str(e))
+
+
+# --- Frontend SPA serving ---------------------------------------------------
+#
+# Both the Mini App and Admin panel are built as static SPAs during the
+# Render build step and served from this same process so a single service
+# handles API, bot, and frontends. Assets are mounted statically; all
+# non-file routes fall back to index.html for client-side routing.
+
+_miniapp_dist = Path("miniapp/dist")
+_admin_dist = Path("admin/dist")
+
+if _miniapp_dist.exists():
+    app.mount("/app/assets", StaticFiles(directory=_miniapp_dist / "assets"), name="miniapp-static")
+
+    @app.get("/app")
+    @app.get("/app/{full_path:path}")
+    async def serve_miniapp(request: Request, full_path: str = ""):
+        file_path = _miniapp_dist / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(_miniapp_dist / "index.html")
+
+if _admin_dist.exists():
+    app.mount("/panel/assets", StaticFiles(directory=_admin_dist / "assets"), name="admin-static")
+
+    @app.get("/panel")
+    @app.get("/panel/{full_path:path}")
+    async def serve_admin(request: Request, full_path: str = ""):
+        file_path = _admin_dist / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(_admin_dist / "index.html")

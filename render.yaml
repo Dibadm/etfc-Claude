@@ -2,7 +2,7 @@ services:
   - type: web
     name: etfc-app
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && cd miniapp && VITE_API_BASE_URL=https://etfc-app.onrender.com npm install && VITE_API_BASE_URL=https://etfc-app.onrender.com npm run build && cd ../admin && VITE_API_BASE_URL=https://etfc-app.onrender.com npm install && VITE_API_BASE_URL=https://etfc-app.onrender.com npm run build
     startCommand: bash start.sh
     envVars:
       - key: ETFC_DATABASE_URL
@@ -10,7 +10,7 @@ services:
       - key: ETFC_TELEGRAM_BOT_TOKEN
         sync: false
       - key: ETFC_MINI_APP_URL
-        sync: false
+        value: https://etfc-app.onrender.com/app/
       - key: ETFC_CORS_ALLOW_ORIGINS
         sync: false
       - key: ETFC_ADMIN_TOKEN
@@ -18,20 +18,4 @@ services:
       - key: ETFC_WAGERING_ENABLED
         value: "false"
       - key: ETFC_LICENSE_NUMBER
-        sync: false
-
-  - type: static
-    name: etfc-miniapp
-    buildCommand: cd miniapp && npm install && npm run build
-    staticPublishPath: ./miniapp/dist
-    envVars:
-      - key: VITE_API_URL
-        sync: false
-
-  - type: static
-    name: etfc-admin
-    buildCommand: cd admin && npm install && npm run build
-    staticPublishPath: ./admin/dist
-    envVars:
-      - key: VITE_API_URL
         sync: false
