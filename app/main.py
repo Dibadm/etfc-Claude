@@ -60,6 +60,16 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+@app.get("/")
+def root():
+    return {
+        "name": "ETFC Betting Engine",
+        "status": "/status",
+        "docs": "/docs",
+        "miniapp_url": get_settings().mini_app_url,
+    }
+
+
 @app.get("/status")
 def status():
     settings = get_settings()
