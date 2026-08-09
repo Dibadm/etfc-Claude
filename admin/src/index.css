@@ -1,0 +1,375 @@
+/* Same design language as the Mini App (see miniapp/src/index.css) —
+   red-corner/blue-corner convention, same palette — adapted here for
+   desktop data-density: sidebar nav, tables, forms. */
+
+:root {
+  --color-bg: #16130f;
+  --color-surface: #201b15;
+  --color-surface-raised: #2a241c;
+  --color-border: #3a3226;
+
+  --color-red-corner: #c22a2a;
+  --color-blue-corner: #2b5fa8;
+  --color-gold: #c99a3b;
+  --color-gold-bright: #e0b756;
+
+  --color-text: #ede7dd;
+  --color-text-muted: #8c8578;
+  --color-text-faint: #5f5949;
+
+  --color-success: #4a9b5e;
+  --color-danger: #b2453f;
+
+  --font-display: "Oswald", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ---------- Login ---------- */
+
+.login-screen {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  width: 340px;
+  text-align: center;
+}
+
+.login-card__title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 4px;
+}
+
+.login-card__subtitle {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+
+/* ---------- Shell / nav ---------- */
+
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  width: 200px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: 20px 12px;
+  flex-shrink: 0;
+}
+
+.admin-sidebar__title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 8px;
+  margin-bottom: 24px;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  padding: 10px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.nav-item--active {
+  background: var(--color-surface-raised);
+  color: var(--color-gold-bright);
+}
+
+.admin-main {
+  flex: 1;
+  padding: 32px 40px;
+  max-width: 900px;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0 0 20px;
+}
+
+/* ---------- Forms ---------- */
+
+.form-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.form-card__title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  margin: 0 0 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-field label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.form-field input,
+.form-field select {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+button:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 1px;
+}
+
+.btn {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.btn-gold {
+  background: var(--color-gold);
+  border-color: var(--color-gold);
+  color: #16130f;
+  font-weight: 600;
+}
+
+.btn-gold:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: none;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ---------- Tables ---------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th {
+  text-align: left;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+td {
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.fight-row {
+  cursor: pointer;
+}
+
+.fight-row:hover {
+  background: var(--color-surface-raised);
+}
+
+.tag-red {
+  color: #e37b7b;
+}
+
+.tag-blue {
+  color: #7ba7e0;
+}
+
+/* ---------- Status pills ---------- */
+
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.pill--open,
+.pill--scheduled {
+  background: rgba(74, 155, 94, 0.18);
+  color: var(--color-success);
+}
+
+.pill--suspended {
+  background: rgba(201, 154, 59, 0.18);
+  color: var(--color-gold-bright);
+}
+
+.pill--completed,
+.pill--settled {
+  background: rgba(140, 133, 120, 0.18);
+  color: var(--color-text-muted);
+}
+
+.pill--cancelled,
+.pill--void {
+  background: rgba(178, 69, 63, 0.18);
+  color: var(--color-danger);
+}
+
+/* ---------- Misc ---------- */
+
+.error-text {
+  color: var(--color-danger);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.success-text {
+  color: var(--color-success);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.back-link {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  padding: 0;
+  margin-bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.market-block {
+  margin-bottom: 20px;
+}
+
+.market-block__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.market-block__title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.odds-cell-input {
+  width: 70px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 4px 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.empty-note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  padding: 16px 0;
+}
