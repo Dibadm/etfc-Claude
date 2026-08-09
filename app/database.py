@@ -15,7 +15,7 @@ real money is involved, or two simultaneous bets/settlements can race.
 The `with_for_update()` calls in the services below are silently
 no-ops on SQLite and fully enforced on Postgres.
 """
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import get_settings
@@ -26,11 +26,6 @@ connect_args = {"check_same_thread": False} if settings.database_url.startswith(
 engine = create_engine(settings.database_url, connect_args=connect_args)
 
 if settings.database_url.startswith("sqlite"):
-    # SQLite ignores ForeignKey() constraints unless this pragma is set
-    # per-connection. Without it, dev/test runs can silently insert rows
-    # that reference a nonexistent fighter/fight/etc — a bug that would
-    # only surface later, in production, on Postgres (which always
-    # enforces FKs). Turning this on keeps SQLite's behavior honest.
     @event.listens_for(engine, "connect")
     def _enable_sqlite_fk(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
@@ -48,3 +43,29 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def _column_exists(conn, table_name: str, column_name: str) -> bool:
+    if settings.database_url.startswith("sqlite"):
+        result = conn.execute(text(f"PRAGMA table_info({table_name})"))
+        return any(row[1] == column_name for row in result)
+    result = conn.execute(
+        text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = :table AND column_name = :column"
+        ),
+        {"table": table_name, "column": column_name},
+    )
+    return result.fetchone() is not None
+
+
+def _ensure_columns():
+    with engine.begin() as conn:
+        if not _column_exists(conn, "users", "phone"):
+            conn.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR(255)"))
+        if not _column_exists(conn, "wallet_transactions", "idempotency_key"):
+            conn.execute(text("ALTER TABLE wallet_transactions ADD COLUMN idempotency_key VARCHAR(255)"))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_transactions_idempotency_key ON wallet_transactions (idempotency_key)"))
+
+
+_ensure_columns()
