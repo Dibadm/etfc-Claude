@@ -5,11 +5,12 @@ import FightsList from "./components/FightsList";
 import FightAdmin from "./components/FightAdmin";
 import FightersList from "./components/FightersList";
 import DepositAccounts from "./components/DepositAccounts";
+import DepositReviews from "./components/DepositReviews";
 import { getToken, clearToken } from "./adminApi";
 
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()));
-  const [page, setPage] = useState("fights"); // "fights" | "fighters" | "deposits"
+  const [page, setPage] = useState("fights"); // "fights" | "fighters" | "deposits" | "reviews"
   const [selectedFight, setSelectedFight] = useState(null);
 
   if (!authed) {
@@ -46,6 +47,12 @@ export default function App() {
         >
           Deposit Accounts
         </button>
+        <button
+          className={`nav-item ${page === "reviews" ? "nav-item--active" : ""}`}
+          onClick={() => setPage("reviews")}
+        >
+          Deposit Reviews
+        </button>
         <button className="nav-item" onClick={handleLogout} style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 6 }}>
           <LogOut size={14} /> Log out
         </button>
@@ -53,6 +60,7 @@ export default function App() {
       <main className="admin-main">
         {page === "fighters" && <FightersList />}
         {page === "deposits" && <DepositAccounts />}
+        {page === "reviews" && <DepositReviews />}
         {page === "fights" && selectedFight && (
           <FightAdmin fight={selectedFight} onBack={() => setSelectedFight(null)} />
         )}

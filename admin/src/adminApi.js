@@ -80,6 +80,12 @@ export const adminApi = {
   activateDepositAccount: (accountId) =>
     request(`/admin/deposit-accounts/${accountId}/activate`, { method: "POST" }),
 
+  listDepositReviews: (status) => request(`/admin/deposit-reviews${status ? `?status=${status}` : ""}`),
+  approveDepositReview: (reviewId) =>
+    request(`/admin/deposit-reviews/${reviewId}/approve`, { method: "POST" }),
+  rejectDepositReview: (reviewId, reason) =>
+    request(`/admin/deposit-reviews/${reviewId}/reject`, { method: "POST", body: { reason } }),
+
   status: () => request("/status"),
 };
 

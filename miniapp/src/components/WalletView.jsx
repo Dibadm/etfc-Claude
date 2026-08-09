@@ -9,6 +9,7 @@ function DepositFlow({ onDeposited }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [successAmount, setSuccessAmount] = useState(null);
+  const [underReview, setUnderReview] = useState(false);
 
   function loadAccount() {
     setAccountError(null);
@@ -22,14 +23,21 @@ function DepositFlow({ onDeposited }) {
     setSubmitting(true);
     setError(null);
     setSuccessAmount(null);
+    setUnderReview(false);
     try {
+      const idempotencyKey = crypto.randomUUID();
       const before = await api.me();
-      const after = await api.submitDeposit(smsText);
-      const credited = (parseFloat(after.wallet.balance) - parseFloat(before.wallet.balance)).toFixed(2);
-      setSuccessAmount(credited);
-      setSmsText("");
-      hapticSuccess();
-      onDeposited();
+      const after = await api.submitDeposit(smsText, undefined, idempotencyKey);
+      if (after.status === "under_review") {
+        setUnderReview(true);
+        hapticError();
+      } else {
+        const credited = (parseFloat(after.wallet.balance) - parseFloat(before.wallet.balance)).toFixed(2);
+        setSuccessAmount(credited);
+        setSmsText("");
+        hapticSuccess();
+        onDeposited();
+      }
     } catch (e) {
       hapticError();
       setError(e instanceof ApiError ? e.message : "Something went wrong — try again");
@@ -102,6 +110,11 @@ function DepositFlow({ onDeposited }) {
           {successAmount} credited to your balance.
         </p>
       )}
+      {underReview && (
+        <p className="success-text" style={{ color: "var(--color-warning)", marginTop: "var(--space-2)" }}>
+          Your deposit is under review. We'll credit it within a few hours.
+        </p>
+      )}
       {error && <p className="error-text">{error}</p>}
     </div>
   );
@@ -119,6 +132,24 @@ export default function WalletView({ me, status, onRefreshMe }) {
           <span className="balance-card__currency">{me.wallet.currency}</span>
         </div>
       </div>
+
+      {!me.phone && status?.wagering_enabled && (
+        <div className="form-card" style={{ margin: 0, marginBottom: "var(--space-3)" }}>
+          <div className="form-card__title">Verify your phone</div>
+          <p style={{ fontSize: 14, color: "var(--color-text-muted)", marginBottom: "var(--space-3)" }}>
+            Open the ETFC Betting bot in Telegram, tap <strong>Start</strong>, and share your phone number to enable deposits.
+          </p>
+          <a
+            href="https://t.me/ETFC_Betting_Bot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary"
+            style={{ display: "inline-block", textDecoration: "none" }}
+          >
+            Open ETFC Bot
+          </a>
+        </div>
+      )}
 
       {status?.wagering_enabled ? (
         <DepositFlow onDeposited={onRefreshMe} />

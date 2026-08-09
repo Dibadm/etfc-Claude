@@ -90,6 +90,12 @@ class TransactionType(str, enum.Enum):
     BET_REFUND = "bet_refund"
 
 
+class DepositReviewStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 # --------------------------------------------------------------------------
 # Users / wallets
 # --------------------------------------------------------------------------
@@ -100,6 +106,7 @@ class User(Base):
     id = Column(String, primary_key=True, default=_uuid)
     telegram_id = Column(String, unique=True, nullable=False, index=True)
     username = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
     is_demo_account = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=_now)
 
@@ -130,6 +137,7 @@ class WalletTransaction(Base):
     amount = Column(Numeric(14, 2), nullable=False)          # signed: + credit, - debit
     balance_after = Column(Numeric(14, 2), nullable=False)
     reference = Column(String, nullable=True)                 # e.g. bet id, deposit ref
+    idempotency_key = Column(String, nullable=True, unique=True)
     created_at = Column(DateTime(timezone=True), default=_now)
 
     wallet = relationship("Wallet", back_populates="transactions")
@@ -335,3 +343,22 @@ class DepositAccount(Base):
     is_active = Column(Boolean, nullable=False, default=False)
     deposit_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), default=_now)
+
+
+class DepositReview(Base):
+    """A deposit that failed automatic online verification and needs
+    manual admin review before the wallet is credited."""
+    __tablename__ = "deposit_reviews"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    amount = Column(Numeric(14, 2), nullable=False)
+    reference = Column(String, nullable=False)
+    sms_text = Column(String, nullable=False)
+    verification_error = Column(String, nullable=False)
+    status = Column(Enum(DepositReviewStatus), nullable=False, default=DepositReviewStatus.PENDING)
+    created_at = Column(DateTime(timezone=True), default=_now)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    reviewer_token = Column(String, nullable=True)
+
+    user = relationship("User")

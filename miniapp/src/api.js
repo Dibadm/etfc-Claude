@@ -46,7 +46,11 @@ export const api = {
   myParlays: () => request("/miniapp/parlays"),
   status: () => request("/status", { auth: false }),
   depositAccount: () => request("/miniapp/deposit-account"),
-  submitDeposit: (smsText) => request("/miniapp/deposit", { method: "POST", body: { sms_text: smsText } }),
+  submitDeposit: (smsText, expectedAmount, idempotencyKey) =>
+    request("/miniapp/deposit", {
+      method: "POST",
+      body: { sms_text: smsText, expected_amount: expectedAmount, idempotency_key: idempotencyKey },
+    }),
 };
 
 export { ApiError };

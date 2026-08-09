@@ -76,15 +76,28 @@ def get_or_create_user_by_telegram_id(db: Session, telegram_id: str, username: s
     return create_user_with_wallet(db, telegram_id, username)
 
 
+def get_user_by_telegram_id(db: Session, telegram_id: str) -> User | None:
+    return db.query(User).filter(User.telegram_id == telegram_id).one_or_none()
+
+
 def _apply_transaction(
     db: Session,
     wallet: Wallet,
     tx_type: TransactionType,
     signed_amount: Decimal,
     reference: str | None = None,
+    idempotency_key: str | None = None,
 ) -> WalletTransaction:
     """Apply a signed amount to a wallet and write the ledger row.
     Caller is responsible for the surrounding commit/rollback."""
+    if idempotency_key is not None:
+        existing = (
+            db.query(WalletTransaction)
+            .filter(WalletTransaction.idempotency_key == idempotency_key)
+            .first()
+        )
+        if existing is not None:
+            return existing
     new_balance = wallet.balance + signed_amount
     if new_balance < 0:
         raise InsufficientFundsError(
@@ -97,12 +110,13 @@ def _apply_transaction(
         amount=signed_amount,
         balance_after=new_balance,
         reference=reference,
+        idempotency_key=idempotency_key,
     )
     db.add(tx)
     return tx
 
 
-def deposit_real_funds(db: Session, user_id: str, amount: Decimal, reference: str) -> Wallet:
+def deposit_real_funds(db: Session, user_id: str, amount: Decimal, reference: str, idempotency_key: str | None = None) -> Wallet:
     """Real-money deposit (e.g. Telebirr). Blocked until licensed."""
     settings = get_settings()
     if not settings.wagering_enabled:
@@ -111,7 +125,7 @@ def deposit_real_funds(db: Session, user_id: str, amount: Decimal, reference: st
             "(ETFC_WAGERING_ENABLED=false). Use demo credits for now."
         )
     wallet = _locked_wallet(db, user_id)
-    _apply_transaction(db, wallet, TransactionType.DEPOSIT, amount, reference=reference)
+    _apply_transaction(db, wallet, TransactionType.DEPOSIT, amount, reference=reference, idempotency_key=idempotency_key)
     db.commit()
     db.refresh(wallet)
     return wallet

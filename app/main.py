@@ -527,6 +527,8 @@ def miniapp_submit_deposit(
     db: Session = Depends(get_db),
 ):
     user = wallet_service.get_or_create_user_by_telegram_id(db, tg_user.telegram_id, tg_user.username)
+    if not user.phone:
+        raise HTTPException(403, "Please verify your phone number in the bot before depositing.")
     if not _deposit_limiter.allow(user.id):
         raise HTTPException(
             429,
@@ -534,7 +536,12 @@ def miniapp_submit_deposit(
             headers={"Retry-After": str(int(_deposit_limiter.retry_after_seconds(user.id)) + 1)},
         )
     try:
-        deposit_service.submit_deposit_sms(db, user.id, payload.sms_text, payload.expected_amount)
+        deposit_service.submit_deposit_sms(
+            db, user.id, payload.sms_text, payload.expected_amount, payload.idempotency_key
+        )
+    except deposit_service.DepositReviewRequiredError as e:
+        db.rollback()
+        return JSONResponse(status_code=200, content={"status": "under_review", "review_id": e.review_id, "message": str(e)})
     except wallet_service.WageringDisabledError as e:
         raise HTTPException(403, str(e))
     except deposit_service.NoActiveDepositAccountError as e:
@@ -581,6 +588,91 @@ def admin_activate_deposit_account(account_id: str, db: Session = Depends(get_db
         return deposit_service.set_deposit_account_active(db, account_id, True)
     except deposit_service.DepositAccountNotFoundError as e:
         raise HTTPException(404, str(e))
+
+
+# --- Admin: deposit review queue -------------------------------------------
+
+@app.get("/admin/deposit-reviews", response_model=list[schemas.DepositReviewOut])
+def admin_list_deposit_reviews(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    review_status = None
+    if status is not None:
+        try:
+            from app.models import DepositReviewStatus
+            review_status = DepositReviewStatus(status)
+        except ValueError:
+            raise HTTPException(400, f"Invalid status: {status}")
+    return [
+        schemas.DepositReviewOut(
+            id=r.id,
+            user_id=r.user_id,
+            amount=r.amount,
+            reference=r.reference,
+            sms_text=r.sms_text,
+            verification_error=r.verification_error,
+            status=r.status.value,
+            created_at=r.created_at,
+            reviewed_at=r.reviewed_at,
+            reviewer_token=r.reviewer_token,
+        )
+        for r in deposit_service.list_deposit_reviews(db, review_status)
+    ]
+
+
+@app.post("/admin/deposit-reviews/{review_id}/approve", response_model=schemas.DepositReviewOut)
+def admin_approve_deposit_review(
+    review_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    try:
+        review = deposit_service.approve_deposit_review(db, review_id)
+    except deposit_service.DepositAccountNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return schemas.DepositReviewOut(
+        id=review.id,
+        user_id=review.user_id,
+        amount=review.amount,
+        reference=review.reference,
+        sms_text=review.sms_text,
+        verification_error=review.verification_error,
+        status=review.status.value,
+        created_at=review.created_at,
+        reviewed_at=review.reviewed_at,
+        reviewer_token=review.reviewer_token,
+    )
+
+
+@app.post("/admin/deposit-reviews/{review_id}/reject", response_model=schemas.DepositReviewOut)
+def admin_reject_deposit_review(
+    review_id: str,
+    payload: schemas.DepositReviewReject,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    try:
+        review = deposit_service.reject_deposit_review(db, review_id)
+    except deposit_service.DepositAccountNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return schemas.DepositReviewOut(
+        id=review.id,
+        user_id=review.user_id,
+        amount=review.amount,
+        reference=review.reference,
+        sms_text=review.sms_text,
+        verification_error=review.verification_error,
+        status=review.status.value,
+        created_at=review.created_at,
+        reviewed_at=review.reviewed_at,
+        reviewer_token=review.reviewer_token,
+    )
 
 
 # --- Frontend SPA serving ---------------------------------------------------

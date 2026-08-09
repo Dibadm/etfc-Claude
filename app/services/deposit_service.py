@@ -14,13 +14,14 @@ how betting_service/wallet_service already do it, so the API layer's
 existing try/except-to-HTTPException pattern extends naturally).
 """
 
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import DepositAccount, TransactionType, Wallet, WalletTransaction
+from app.models import DepositAccount, DepositReview, DepositReviewStatus, TransactionType, User, Wallet, WalletTransaction
 from app.services import telebirr_verify, wallet_service
 from app.services.telebirr_sms_parser import (
     extract_receipt_number,
@@ -55,6 +56,12 @@ class ReceiptVerificationFailedError(Exception):
 
 class AmountMismatchError(Exception):
     pass
+
+
+class DepositReviewRequiredError(Exception):
+    def __init__(self, review_id: str, message: str = "Deposit is under manual review."):
+        self.review_id = review_id
+        super().__init__(message)
 
 
 def get_active_deposit_account(db: Session) -> DepositAccount:
@@ -99,12 +106,23 @@ def submit_deposit_sms(
     user_id: str,
     sms_text: str,
     expected_amount: Decimal | None = None,
+    idempotency_key: str | None = None,
 ) -> Wallet:
     settings = get_settings()
     if not settings.wagering_enabled:
         raise wallet_service.WageringDisabledError(
             "Real-money deposits are disabled until the Lottery Service license is active."
         )
+
+    if idempotency_key is not None:
+        existing = (
+            db.query(WalletTransaction)
+            .filter(WalletTransaction.idempotency_key == idempotency_key)
+            .first()
+        )
+        if existing is not None:
+            wallet = db.query(Wallet).filter(Wallet.id == existing.wallet_id).one()
+            return wallet
 
     account = get_active_deposit_account(db)
 
@@ -126,12 +144,24 @@ def submit_deposit_sms(
         verification = telebirr_verify.verify_receipt_online(receipt_no, timeout=settings.telebirr_verify_timeout)
 
         if not verification.ok:
-            # A genuinely flaky/unreachable receipt site shouldn't block a
-            # real deposit — fall back to the SMS-regex checks already
-            # done above. A receipt that's actively wrong (not found,
-            # amount doesn't exist) is a real rejection, not a fallback.
             if verification.error not in ("receipt_site_unreachable", "receipt_site_timeout", "receipt_fetch_error"):
-                raise ReceiptVerificationFailedError("Could not verify this receipt. Please try again later.")
+                review = DepositReview(
+                    user_id=user_id,
+                    amount=parsed.amount,
+                    reference=parsed.reference,
+                    sms_text=sms_text,
+                    verification_error=verification.error,
+                )
+                db.add(review)
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    raise
+                raise DepositReviewRequiredError(
+                    review.id,
+                    "We couldn't verify this receipt automatically. Your deposit is under review — we'll credit it within a few hours.",
+                )
         else:
             if verification.amount is not None and abs(verification.amount - parsed.amount) > Decimal("0.01"):
                 raise AmountMismatchError(
@@ -149,15 +179,10 @@ def submit_deposit_sms(
         if not amount_ok:
             raise AmountMismatchError(f"SMS shows {parsed.amount} ETB but {expected_amount} ETB was expected.")
 
-    # The reference_already_used() check above is a friendly pre-check, not
-    # the actual guard — it's a plain SELECT with no lock behind it, so two
-    # concurrent submissions of the same SMS could both pass it before
-    # either commits. The real guard is the partial unique index on
-    # WalletTransaction(reference) WHERE type='deposit' (see models.py) —
-    # this catches that race and turns it into the same clean error the
-    # pre-check gives, instead of a raw 500.
     try:
-        wallet = wallet_service.deposit_real_funds(db, user_id, parsed.amount, reference=parsed.reference)
+        wallet = wallet_service.deposit_real_funds(
+            db, user_id, parsed.amount, reference=parsed.reference, idempotency_key=idempotency_key
+        )
     except IntegrityError:
         db.rollback()
         raise DuplicateReferenceError("This transaction has already been credited.")
@@ -222,3 +247,66 @@ def set_deposit_account_active(db: Session, account_id: str, is_active: bool) ->
     db.commit()
     db.refresh(account)
     return account
+
+
+# --- Manual review queue for failed online verifications ---------------------
+
+
+def create_deposit_review(db: Session, user_id: str, amount: Decimal, reference: str, sms_text: str, verification_error: str) -> DepositReview:
+    review = DepositReview(
+        user_id=user_id,
+        amount=amount,
+        reference=reference,
+        sms_text=sms_text,
+        verification_error=verification_error,
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+def get_deposit_review(db: Session, review_id: str) -> DepositReview | None:
+    return db.query(DepositReview).filter(DepositReview.id == review_id).one_or_none()
+
+
+def list_deposit_reviews(db: Session, status: DepositReviewStatus | None = None) -> list[DepositReview]:
+    query = db.query(DepositReview)
+    if status is not None:
+        query = query.filter(DepositReview.status == status)
+    return query.order_by(DepositReview.created_at.desc()).all()
+
+
+def approve_deposit_review(db: Session, review_id: str, reviewer_token: str | None = None) -> DepositReview:
+    review = db.query(DepositReview).filter(DepositReview.id == review_id).one_or_none()
+    if review is None:
+        raise DepositAccountNotFoundError(f"No deposit review {review_id}")
+    if review.status != DepositReviewStatus.PENDING:
+        raise ValueError(f"Review is already {review.status}")
+
+    user = db.query(User).filter(User.id == review.user_id).one_or_none()
+    if user is None:
+        raise ValueError(f"User {review.user_id} not found")
+
+    wallet = wallet_service.deposit_real_funds(db, user.id, review.amount, reference=review.reference)
+    review.status = DepositReviewStatus.APPROVED
+    review.reviewed_at = datetime.now(timezone.utc)
+    review.reviewer_token = reviewer_token
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+def reject_deposit_review(db: Session, review_id: str, reviewer_token: str | None = None) -> DepositReview:
+    review = db.query(DepositReview).filter(DepositReview.id == review_id).one_or_none()
+    if review is None:
+        raise DepositAccountNotFoundError(f"No deposit review {review_id}")
+    if review.status != DepositReviewStatus.PENDING:
+        raise ValueError(f"Review is already {review.status}")
+
+    review.status = DepositReviewStatus.REJECTED
+    review.reviewed_at = datetime.now(timezone.utc)
+    review.reviewer_token = reviewer_token
+    db.commit()
+    db.refresh(review)
+    return review

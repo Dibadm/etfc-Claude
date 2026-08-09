@@ -149,6 +149,7 @@ class UserOut(BaseModel):
     id: str
     telegram_id: str
     username: str | None
+    phone: str | None
     is_demo_account: bool
     wallet: WalletOut
 
@@ -225,6 +226,29 @@ class DepositAccountCreate(BaseModel):
 class DepositSmsSubmit(BaseModel):
     sms_text: str
     expected_amount: Decimal | None = None
+    idempotency_key: str | None = None
+
+
+class DepositReviewOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    user_id: str
+    amount: Decimal
+    reference: str
+    sms_text: str
+    verification_error: str
+    status: str
+    created_at: datetime
+    reviewed_at: datetime | None
+    reviewer_token: str | None
+
+
+class DepositReviewApprove(BaseModel):
+    pass
+
+
+class DepositReviewReject(BaseModel):
+    reason: str | None = None
 
 
 class ParlayCreate(BaseModel):
