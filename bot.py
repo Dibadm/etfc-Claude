@@ -15,7 +15,7 @@ Requires:  ETFC_TELEGRAM_BOT_TOKEN, ETFC_MINI_APP_URL (must be https:// for
 
 import logging
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Update, WebAppInfo
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from app.config import get_settings
@@ -32,9 +32,11 @@ def _mini_app_keyboard(settings) -> InlineKeyboardMarkup:
     )
 
 
-def _contact_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("Share your phone number", request_contact=True)]]
+def _contact_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("Share your phone number", request_contact=True)]],
+        one_time_keyboard=True,
+        resize_keyboard=True,
     )
 
 
