@@ -19,7 +19,9 @@ different logic.
 """
 from decimal import Decimal
 from functools import lru_cache
+from typing import Any
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -60,6 +62,13 @@ class Settings(BaseSettings):
     # deployed URL, plus localhost for dev). Comma-separated via env var,
     # e.g. ETFC_CORS_ALLOW_ORIGINS="https://your-miniapp.pages.dev,http://localhost:5173"
     cors_allow_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            return [o.strip() for o in v.split(",") if o.strip()]
+        return v
 
     # Bearer token gating every admin-only endpoint (creating fights/
     # markets, adjusting odds, suspending markets, settling/voiding
