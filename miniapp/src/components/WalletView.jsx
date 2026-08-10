@@ -5,6 +5,10 @@ import { hapticError, hapticSuccess } from "../telegram";
 function DepositFlow({ onDeposited }) {
   const [account, setAccount] = useState(null);
   const [accountError, setAccountError] = useState(null);
+
+  useEffect(() => {
+    api.depositAccount().then(setAccount).catch((e) => setAccountError(e.message));
+  }, []);
   const [smsText, setSmsText] = useState("");
   const [expectedAmount, setExpectedAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -284,7 +288,9 @@ export default function WalletView({ me, status, onRefreshMe }) {
             Deposit
           </button>
         ) : (
-          <DepositFlow onDeposited={onRefreshMe} />
+          <div style={{ marginBottom: "var(--space-3)" }}>
+            <DepositFlow onDeposited={onRefreshMe} />
+          </div>
         )}
         {status?.wagering_enabled ? (
           !showWithdraw ? (
