@@ -15,7 +15,7 @@ services:
       - key: ETFC_TELEGRAM_BOT_TOKEN
         sync: false
       - key: ETFC_MINI_APP_URL
-        value: https://etfc-api.onrender.com/miniapp
+        value: https://etfc-app.onrender.com/miniapp
       - key: ETFC_TELEBIRR_VERIFY_ENABLED
         value: true
       - key: ETFC_LICENSE_NUMBER
