@@ -6,18 +6,29 @@ function DepositFlow({ onDeposited }) {
   const [account, setAccount] = useState(null);
   const [accountError, setAccountError] = useState(null);
   const [smsText, setSmsText] = useState("");
+  const [expectedAmount, setExpectedAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [successAmount, setSuccessAmount] = useState(null);
   const [underReview, setUnderReview] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  function loadAccount() {
-    setAccountError(null);
-    api.depositAccount().then(setAccount).catch((e) => setAccountError(e.message));
+  function parseAmountFromSms(text) {
+    const match = text.match(/transferred\s+ETB\s*([\d,]+(?:\.\d{1,2})?)/i) || text.match(/ETB\s*([\d,]+(?:\.\d{1,2})?)/i);
+    if (match) {
+      return match[1].replace(/,/g, "");
+    }
+    return "";
   }
 
-  useEffect(loadAccount, []);
+  function handleSmsChange(e) {
+    const value = e.target.value;
+    setSmsText(value);
+    const parsed = parseAmountFromSms(value);
+    if (parsed && !expectedAmount) {
+      setExpectedAmount(parsed);
+    }
+  }
 
   async function handleCopyPhone() {
     if (!account?.phone) return;
@@ -40,7 +51,7 @@ function DepositFlow({ onDeposited }) {
     try {
       const idempotencyKey = crypto.randomUUID();
       const before = await api.me();
-      const after = await api.submitDeposit(smsText, undefined, idempotencyKey);
+      const after = await api.submitDeposit(smsText, expectedAmount || undefined, idempotencyKey);
       if (after.status === "under_review") {
         setUnderReview(true);
         hapticError();
@@ -48,6 +59,7 @@ function DepositFlow({ onDeposited }) {
         const credited = (parseFloat(after.wallet.balance) - parseFloat(before.wallet.balance)).toFixed(2);
         setSuccessAmount(credited);
         setSmsText("");
+        setExpectedAmount("");
         hapticSuccess();
         onDeposited();
       }
@@ -101,11 +113,33 @@ function DepositFlow({ onDeposited }) {
       )}
 
       <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: "var(--space-3)" }}>
+          <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, display: "block" }}>Amount (ETB)</label>
+          <input
+            type="number"
+            required
+            min="0"
+            step="0.01"
+            placeholder="e.g. 500"
+            value={expectedAmount}
+            onChange={(e) => setExpectedAmount(e.target.value)}
+            style={{
+              width: "100%",
+              background: "var(--color-surface-raised)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-md)",
+              padding: "var(--space-3)",
+              color: "var(--color-text)",
+              fontSize: 14,
+              marginBottom: "var(--space-3)",
+            }}
+          />
+        </div>
         <textarea
           required
           placeholder="Paste the full Telebirr confirmation SMS you received here…"
           value={smsText}
-          onChange={(e) => setSmsText(e.target.value)}
+          onChange={handleSmsChange}
           rows={5}
           style={{
             width: "100%",
@@ -119,7 +153,7 @@ function DepositFlow({ onDeposited }) {
             resize: "vertical",
           }}
         />
-        <button className="btn-primary" disabled={submitting || !smsText.trim() || !account}>
+        <button className="btn-primary" disabled={submitting || !smsText.trim() || !account || !expectedAmount}>
           {submitting ? "Verifying…" : "Submit Deposit"}
         </button>
       </form>
