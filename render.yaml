@@ -5,17 +5,18 @@ services:
     buildCommand: pip install -r requirements.txt && cd miniapp && VITE_API_BASE_URL=https://etfc-app.onrender.com npm install && VITE_API_BASE_URL=https://etfc-app.onrender.com npm run build && cd ../admin && VITE_API_BASE_URL=https://etfc-app.onrender.com npm install && VITE_API_BASE_URL=https://etfc-app.onrender.com npm run build
     startCommand: bash start.sh
     envVars:
-      - key: ETFC_DATABASE_URL
-        value: postgresql://neondb_owner:npg_d8H1NUYpmPyJ@ep-flat-mode-ayzx7ovz-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      # Set ETFC_DATABASE_URL in Render's dashboard — do NOT commit plaintext credentials
+      - key: ETFC_WAGERING_ENABLED
+        value: false
+      - key: ETFC_CORS_ALLOW_ORIGINS
+        value: "*"
+      - key: ETFC_ADMIN_TOKEN
+        generateValue: true
       - key: ETFC_TELEGRAM_BOT_TOKEN
         sync: false
       - key: ETFC_MINI_APP_URL
-        value: https://etfc-app.onrender.com/app/
-      - key: ETFC_CORS_ALLOW_ORIGINS
-        sync: false
-      - key: ETFC_ADMIN_TOKEN
-        sync: false
-      - key: ETFC_WAGERING_ENABLED
-        value: "false"
+        value: https://etfc-api.onrender.com/miniapp
+      - key: ETFC_TELEBIRR_VERIFY_ENABLED
+        value: true
       - key: ETFC_LICENSE_NUMBER
         sync: false

@@ -22,6 +22,17 @@ class FighterCreate(BaseModel):
     nickname: str | None = None
     image_url: str | None = None
 
+    @field_validator("image_url")
+    @classmethod
+    def _validate_image_url(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        if not value.startswith(("http://", "https://")):
+            raise ValueError("image_url must start with http:// or https://")
+        if len(value) > 2048:
+            raise ValueError("image_url must be 2048 characters or fewer")
+        return value
+
 
 class FighterOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -36,6 +47,17 @@ class FighterUpdate(BaseModel):
     name: str | None = None
     nickname: str | None = None
     image_url: str | None = None
+
+    @field_validator("image_url")
+    @classmethod
+    def _validate_image_url(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        if not value.startswith(("http://", "https://")):
+            raise ValueError("image_url must start with http:// or https://")
+        if len(value) > 2048:
+            raise ValueError("image_url must be 2048 characters or fewer")
+        return value
 
 
 class FightCreate(BaseModel):

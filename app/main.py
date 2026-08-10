@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
 from app.admin_auth import require_admin
@@ -81,6 +81,11 @@ def status():
         "currency": settings.currency,
         "license_number": settings.license_number or None,
     }
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
 
 
 @app.get("/admin/ping")
@@ -176,13 +181,23 @@ def list_fights(status: models.FightStatus | None = None, db: Session = Depends(
         query = query.filter(models.Fight.status == status)
     fights = query.order_by(models.Fight.scheduled_at).all()
 
+    moneyline_by_fight = {}
+    if fights:
+        fight_ids = [f.id for f in fights]
+        moneylines = (
+            db.query(models.Market)
+            .options(selectinload(models.Market.outcomes))
+            .filter(
+                models.Market.fight_id.in_(fight_ids),
+                models.Market.market_type == models.MarketType.MONEYLINE,
+            )
+            .all()
+        )
+        moneyline_by_fight = {m.fight_id: m for m in moneylines}
+
     results = []
     for fight in fights:
-        moneyline = (
-            db.query(models.Market)
-            .filter(models.Market.fight_id == fight.id, models.Market.market_type == models.MarketType.MONEYLINE)
-            .one_or_none()
-        )
+        moneyline = moneyline_by_fight.get(fight.id)
         odds_a = odds_b = None
         if moneyline is not None:
             for outcome in moneyline.outcomes:
