@@ -22,13 +22,13 @@ export default function Jackpot() {
     }
   }, [selectedRound]);
 
-  function togglePick(fightId, fighterId) {
+  function togglePick(fightId, fighterSide) {
     setPicks((prev) => {
       const next = { ...prev };
-      if (next[fightId] === fighterId) {
+      if (next[fightId] === fighterSide) {
         delete next[fightId];
       } else {
-        next[fightId] = fighterId;
+        next[fightId] = fighterSide;
       }
       return next;
     });
@@ -57,7 +57,7 @@ export default function Jackpot() {
 
   if (selectedRound) {
     const alreadyEntered = myEntries.some((e) => e.round_id === selectedRound.id);
-    const allPicked = selectedRound.fight_ids.length === Object.keys(picks).length;
+    const allPicked = (selectedRound.fight_ids?.length || selectedRound.fight_ids.length) === Object.keys(picks).length;
     const now = new Date();
     const isLocked = now >= new Date(selectedRound.deadline);
     const roundStatus = selectedRound.status;
@@ -107,41 +107,69 @@ export default function Jackpot() {
           {!alreadyEntered && roundStatus === "open" && !isLocked && (
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: "var(--space-3)" }}>
-                {selectedRound.fight_ids.map((fightId) => (
-                  <div
-                    key={fightId}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "var(--space-2) 0",
-                      borderBottom: "1px solid var(--color-border)",
-                    }}
-                  >
-                    <span style={{ fontSize: 14 }}>Fight {fightId.slice(0, 8)}</span>
-                    <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                      {["A", "B"].map((side) => (
+                {(selectedRound.fights || []).map((fight, idx) => {
+                  const fa = fight.fighter_a || {};
+                  const fb = fight.fighter_b || {};
+                  const faName = fa.nickname || fa.name || "Fighter A";
+                  const fbName = fb.nickname || fb.name || "Fighter B";
+                  const event = fight.event_name || "";
+                  const picked = picks[fight.id];
+
+                  return (
+                    <div
+                      key={fight.id}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "var(--space-2)",
+                        padding: "var(--space-3) 0",
+                        borderBottom: "1px solid var(--color-border)",
+                      }}
+                    >
+                      <div style={{ fontSize: 12, color: "var(--color-text-faint)", fontWeight: 600 }}>
+                        {event} · Fight {idx + 1}
+                      </div>
+                      <div style={{ display: "flex", gap: "var(--space-2)" }}>
                         <button
-                          key={side}
                           type="button"
-                          onClick={() => togglePick(fightId, `${side}`)}
+                          onClick={() => togglePick(fight.id, "A")}
                           style={{
-                            padding: "6px 12px",
+                            flex: 1,
+                            padding: "10px",
                             borderRadius: "var(--radius-md)",
-                            border: picks[fightId] === `${side}` ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
-                            background: picks[fightId] === `${side}` ? "var(--color-primary)" : "var(--color-surface)",
-                            color: picks[fightId] === `${side}` ? "#fff" : "var(--color-text)",
+                            border: picked === "A" ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                            background: picked === "A" ? "var(--color-primary)" : "var(--color-surface)",
+                            color: picked === "A" ? "#fff" : "var(--color-text)",
                             cursor: "pointer",
                             fontSize: 13,
                             fontWeight: 600,
+                            textAlign: "center",
                           }}
                         >
-                          Fighter {side}
+                          {faName}
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => togglePick(fight.id, "B")}
+                          style={{
+                            flex: 1,
+                            padding: "10px",
+                            borderRadius: "var(--radius-md)",
+                            border: picked === "B" ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                            background: picked === "B" ? "var(--color-primary)" : "var(--color-surface)",
+                            color: picked === "B" ? "#fff" : "var(--color-text)",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            textAlign: "center",
+                          }}
+                        >
+                          {fbName}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <button
                 className="btn-primary"

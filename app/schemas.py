@@ -289,6 +289,7 @@ class JackpotRoundOut(BaseModel):
     status: str
     settled_at: datetime | None
     created_at: datetime
+    fights: list[dict] = []
 
 
 class JackpotRoundCreate(BaseModel):

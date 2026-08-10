@@ -686,26 +686,43 @@ def admin_reject_deposit_review(
 @app.get("/jackpot/rounds", response_model=list[schemas.JackpotRoundOut])
 def list_jackpot_rounds(db: Session = Depends(get_db)):
     rounds = jackpot_service.list_rounds(db)
-    return [
-        schemas.JackpotRoundOut(
-            id=r.id,
-            name=r.name,
-            fight_ids=r.fight_ids,
-            entry_fee=r.entry_fee,
-            prize_pool=r.prize_pool,
-            min_correct_to_win=r.min_correct_to_win,
-            deadline=r.deadline,
-            status=r.status.value,
-            settled_at=r.settled_at,
-            created_at=r.created_at,
+    result = []
+    for r in rounds:
+        fights = db.query(models.Fight).filter(models.Fight.id.in_(r.fight_ids)).all() if r.fight_ids else []
+        fight_map = {f.id: f for f in fights}
+        ordered_fights = [fight_map[fid] for fid in r.fight_ids if fid in fight_map]
+        result.append(
+            schemas.JackpotRoundOut(
+                id=r.id,
+                name=r.name,
+                fight_ids=r.fight_ids,
+                entry_fee=r.entry_fee,
+                prize_pool=r.prize_pool,
+                min_correct_to_win=r.min_correct_to_win,
+                deadline=r.deadline,
+                status=r.status.value,
+                settled_at=r.settled_at,
+                created_at=r.created_at,
+                fights=[
+                    {
+                        "id": f.id,
+                        "event_name": f.event_name,
+                        "fighter_a": {"name": f.fighter_a.name, "nickname": f.fighter_a.nickname},
+                        "fighter_b": {"name": f.fighter_b.name, "nickname": f.fighter_b.nickname},
+                    }
+                    for f in ordered_fights
+                ],
+            )
         )
-        for r in rounds
-    ]
+    return result
 
 
 @app.get("/jackpot/rounds/{round_id}", response_model=schemas.JackpotRoundOut)
 def get_jackpot_round(round_id: str, db: Session = Depends(get_db)):
     r = jackpot_service.get_round(db, round_id)
+    fights = db.query(models.Fight).filter(models.Fight.id.in_(r.fight_ids)).all() if r.fight_ids else []
+    fight_map = {f.id: f for f in fights}
+    ordered_fights = [fight_map[fid] for fid in r.fight_ids if fid in fight_map]
     return schemas.JackpotRoundOut(
         id=r.id,
         name=r.name,
@@ -717,6 +734,15 @@ def get_jackpot_round(round_id: str, db: Session = Depends(get_db)):
         status=r.status.value,
         settled_at=r.settled_at,
         created_at=r.created_at,
+        fights=[
+            {
+                "id": f.id,
+                "event_name": f.event_name,
+                "fighter_a": {"name": f.fighter_a.name, "nickname": f.fighter_a.nickname},
+                "fighter_b": {"name": f.fighter_b.name, "nickname": f.fighter_b.nickname},
+            }
+            for f in ordered_fights
+        ],
     )
 
 
