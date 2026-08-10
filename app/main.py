@@ -835,6 +835,23 @@ def miniapp_list_my_jackpot_entries(
     return result
 
 
+@app.get("/miniapp/withdrawals", response_model=list[dict])
+def miniapp_list_withdrawals(
+    tg_user: TelegramUser = Depends(get_telegram_user),
+    db: Session = Depends(get_db),
+):
+    return []
+
+
+@app.post("/miniapp/withdrawals", response_model=dict)
+def miniapp_request_withdrawal(
+    payload: dict,
+    tg_user: TelegramUser = Depends(get_telegram_user),
+    db: Session = Depends(get_db),
+):
+    raise HTTPException(501, "Withdrawals are not implemented yet.")
+
+
 # --- Admin: jackpot management ----------------------------------------------
 
 @app.post("/admin/jackpot/rounds", response_model=schemas.JackpotRoundOut)

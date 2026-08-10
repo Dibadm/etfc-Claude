@@ -55,6 +55,9 @@ export const api = {
   submitJackpotEntry: (roundId, picks) =>
     request("/miniapp/jackpot/entries", { method: "POST", body: { round_id: roundId, picks } }),
   myJackpotEntries: () => request("/miniapp/jackpot/entries/me"),
+  myWithdrawals: () => request("/miniapp/withdrawals"),
+  requestWithdrawal: (amount, telebirr) =>
+    request("/miniapp/withdrawals", { method: "POST", body: { amount, telebirr_phone: telebirr } }),
 };
 
 export { ApiError };
