@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.models import BetStatus, FightStatus, JackpotStatus, MarketStatus, MarketType, ParlayLegStatus, ParlayStatus, VictoryMethod
+from app.models import BetStatus, FightStatus, JackpotStatus, MarketStatus, MarketType, ParlayLegStatus, ParlayStatus, VictoryMethod, WithdrawalStatus
 
 MIN_DECIMAL_ODDS = Decimal("1.01")
 
@@ -346,3 +346,20 @@ class JackpotEntryOut(BaseModel):
 class JackpotEntrySubmit(BaseModel):
     round_id: str
     picks: dict[str, str]  # fight_id -> picked_winner_id
+
+
+class WithdrawalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    user_id: str
+    amount: Decimal
+    telebirr_phone: str
+    status: str
+    created_at: datetime
+    reviewed_at: datetime | None
+
+
+class WithdrawalCreate(BaseModel):
+    amount: Decimal
+    telebirr_phone: str
+    idempotency_key: str | None = None

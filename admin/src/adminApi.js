@@ -91,6 +91,12 @@ export const adminApi = {
   settleJackpotRound: (roundId) => request(`/admin/jackpot/rounds/${roundId}/settle`, { method: "POST" }),
   jackpotEntries: (roundId) => request(`/admin/jackpot/rounds/${roundId}/entries`),
 
+  listWithdrawals: (status) => request(`/admin/withdrawals${status ? `?status=${status}` : ""}`),
+  approveWithdrawal: (withdrawalId) =>
+    request(`/admin/withdrawals/${withdrawalId}/approve`, { method: "POST" }),
+  rejectWithdrawal: (withdrawalId) =>
+    request(`/admin/withdrawals/${withdrawalId}/reject`, { method: "POST" }),
+
   status: () => request("/status"),
 };
 

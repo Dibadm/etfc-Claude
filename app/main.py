@@ -12,7 +12,7 @@ from app import models, schemas
 from app.admin_auth import require_admin
 from app.config import get_settings
 from app.database import Base, engine, get_db
-from app.services import betting_service, deposit_service, jackpot_service, odds_service, parlay_service, settlement_service, wallet_service
+from app.services import betting_service, deposit_service, jackpot_service, odds_service, parlay_service, settlement_service, wallet_service, withdrawal_service
 from app.services.rate_limiter import RateLimiter, get_client_ip
 from app.telegram_auth import TelegramUser, get_telegram_user
 
@@ -835,21 +835,53 @@ def miniapp_list_my_jackpot_entries(
     return result
 
 
-@app.get("/miniapp/withdrawals", response_model=list[dict])
+@app.get("/miniapp/withdrawals", response_model=list[schemas.WithdrawalOut])
 def miniapp_list_withdrawals(
     tg_user: TelegramUser = Depends(get_telegram_user),
     db: Session = Depends(get_db),
 ):
-    return []
+    user = wallet_service.get_or_create_user_by_telegram_id(db, tg_user.telegram_id, tg_user.username)
+    withdrawals = withdrawal_service.list_withdrawals(db, user_id=user.id)
+    return [
+        schemas.WithdrawalOut(
+            id=w.id,
+            user_id=w.user_id,
+            amount=w.amount,
+            telebirr_phone=w.telebirr_phone,
+            status=w.status.value,
+            created_at=w.created_at,
+            reviewed_at=w.reviewed_at,
+        )
+        for w in withdrawals
+    ]
 
 
-@app.post("/miniapp/withdrawals", response_model=dict)
+@app.post("/miniapp/withdrawals", response_model=schemas.WithdrawalOut)
 def miniapp_request_withdrawal(
-    payload: dict,
+    payload: schemas.WithdrawalCreate,
     tg_user: TelegramUser = Depends(get_telegram_user),
     db: Session = Depends(get_db),
 ):
-    raise HTTPException(501, "Withdrawals are not implemented yet.")
+    user = wallet_service.get_or_create_user_by_telegram_id(db, tg_user.telegram_id, tg_user.username)
+    try:
+        withdrawal = withdrawal_service.request_withdrawal(
+            db, user.id, payload.amount, payload.telebirr_phone, payload.idempotency_key
+        )
+    except withdrawal_service.WageringDisabledError as e:
+        raise HTTPException(403, str(e))
+    except withdrawal_service.InsufficientFundsError as e:
+        raise HTTPException(402, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return schemas.WithdrawalOut(
+        id=withdrawal.id,
+        user_id=withdrawal.user_id,
+        amount=withdrawal.amount,
+        telebirr_phone=withdrawal.telebirr_phone,
+        status=withdrawal.status.value,
+        created_at=withdrawal.created_at,
+        reviewed_at=withdrawal.reviewed_at,
+    )
 
 
 # --- Admin: jackpot management ----------------------------------------------
@@ -941,6 +973,82 @@ def admin_list_jackpot_entries(round_id: str, db: Session = Depends(get_db), _: 
             )
         )
     return result
+
+
+# --- Admin: withdrawals ----------------------------------------------------
+
+@app.get("/admin/withdrawals", response_model=list[schemas.WithdrawalOut])
+def admin_list_withdrawals(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    query = db.query(models.Withdrawal)
+    if status is not None:
+        try:
+            withdrawal_status = models.WithdrawalStatus(status)
+        except ValueError:
+            raise HTTPException(400, f"Invalid status: {status}")
+        query = query.filter(models.Withdrawal.status == withdrawal_status)
+    withdrawals = query.order_by(models.Withdrawal.created_at.desc()).all()
+    return [
+        schemas.WithdrawalOut(
+            id=w.id,
+            user_id=w.user_id,
+            amount=w.amount,
+            telebirr_phone=w.telebirr_phone,
+            status=w.status.value,
+            created_at=w.created_at,
+            reviewed_at=w.reviewed_at,
+        )
+        for w in withdrawals
+    ]
+
+
+@app.post("/admin/withdrawals/{withdrawal_id}/approve", response_model=schemas.WithdrawalOut)
+def admin_approve_withdrawal(
+    withdrawal_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    try:
+        withdrawal = withdrawal_service.approve_withdrawal(db, withdrawal_id)
+    except withdrawal_service.WithdrawalNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except withdrawal_service.InvalidStatusError as e:
+        raise HTTPException(400, str(e))
+    return schemas.WithdrawalOut(
+        id=withdrawal.id,
+        user_id=withdrawal.user_id,
+        amount=withdrawal.amount,
+        telebirr_phone=withdrawal.telebirr_phone,
+        status=withdrawal.status.value,
+        created_at=withdrawal.created_at,
+        reviewed_at=withdrawal.reviewed_at,
+    )
+
+
+@app.post("/admin/withdrawals/{withdrawal_id}/reject", response_model=schemas.WithdrawalOut)
+def admin_reject_withdrawal(
+    withdrawal_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    try:
+        withdrawal = withdrawal_service.reject_withdrawal(db, withdrawal_id)
+    except withdrawal_service.WithdrawalNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except withdrawal_service.InvalidStatusError as e:
+        raise HTTPException(400, str(e))
+    return schemas.WithdrawalOut(
+        id=withdrawal.id,
+        user_id=withdrawal.user_id,
+        amount=withdrawal.amount,
+        telebirr_phone=withdrawal.telebirr_phone,
+        status=withdrawal.status.value,
+        created_at=withdrawal.created_at,
+        reviewed_at=withdrawal.reviewed_at,
+    )
 
 
 # --- Frontend SPA serving ---------------------------------------------------

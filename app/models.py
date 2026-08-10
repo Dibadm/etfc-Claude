@@ -106,6 +106,13 @@ class JackpotStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
+class WithdrawalStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    PAID = "paid"
+
+
 # --------------------------------------------------------------------------
 # Users / wallets
 # --------------------------------------------------------------------------
@@ -383,3 +390,20 @@ class JackpotPick(Base):
     entry = relationship("JackpotEntry", back_populates="picks")
     fight = relationship("Fight")
     picked_winner = relationship("Fighter", foreign_keys=[picked_winner_id])
+
+
+class Withdrawal(Base):
+    """A user request to move funds out of the platform to Telebirr."""
+    __tablename__ = "withdrawals"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    amount = Column(Numeric(14, 2), nullable=False)
+    telebirr_phone = Column(String, nullable=False)
+    status = Column(Enum(WithdrawalStatus), nullable=False, default=WithdrawalStatus.PENDING)
+    idempotency_key = Column(String, nullable=True, unique=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    reviewer_token = Column(String, nullable=True)
+
+    user = relationship("User")

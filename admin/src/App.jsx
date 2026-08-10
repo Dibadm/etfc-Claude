@@ -7,11 +7,12 @@ import FightersList from "./components/FightersList";
 import DepositAccounts from "./components/DepositAccounts";
 import DepositReviews from "./components/DepositReviews";
 import JackpotAdmin from "./components/JackpotAdmin";
+import Withdrawals from "./components/Withdrawals";
 import { getToken, clearToken } from "./adminApi";
 
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()));
-  const [page, setPage] = useState("fights"); // "fights" | "fighters" | "deposits" | "reviews" | "jackpot"
+  const [page, setPage] = useState("fights"); // "fights" | "fighters" | "deposits" | "reviews" | "jackpot" | "withdrawals"
   const [selectedFight, setSelectedFight] = useState(null);
 
   if (!authed) {
@@ -60,6 +61,12 @@ export default function App() {
         >
           Jackpot
         </button>
+        <button
+          className={`nav-item ${page === "withdrawals" ? "nav-item--active" : ""}`}
+          onClick={() => setPage("withdrawals")}
+        >
+          Withdrawals
+        </button>
         <button className="nav-item" onClick={handleLogout} style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 6 }}>
           <LogOut size={14} /> Log out
         </button>
@@ -69,6 +76,7 @@ export default function App() {
         {page === "deposits" && <DepositAccounts />}
         {page === "reviews" && <DepositReviews />}
         {page === "jackpot" && <JackpotAdmin />}
+        {page === "withdrawals" && <Withdrawals />}
         {page === "fights" && selectedFight && (
           <FightAdmin fight={selectedFight} onBack={() => setSelectedFight(null)} />
         )}
