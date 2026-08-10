@@ -793,7 +793,7 @@ def miniapp_list_my_jackpot_entries(
     db: Session = Depends(get_db),
 ):
     user = wallet_service.get_or_create_user_by_telegram_id(db, tg_user.telegram_id, tg_user.username)
-    entries = db.query(JackpotEntry).filter(JackpotEntry.user_id == user.id).all()
+    entries = db.query(models.JackpotEntry).filter(models.JackpotEntry.user_id == user.id).all()
     result = []
     for entry in entries:
         picks_out = [
