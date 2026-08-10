@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Swords, Wallet as WalletIcon, ListChecks, Trophy } from "lucide-react";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import FightList from "./components/FightList";
 import FightDetail from "./components/FightDetail";
 import BetSlip from "./components/BetSlip";
@@ -37,7 +37,13 @@ export default function App() {
   const [loadError, setLoadError] = useState(null);
 
   const refreshMe = useCallback(() => {
-    api.me().then(setMe).catch((e) => setLoadError(e.message));
+    api.me().then(setMe).catch((e) => {
+      if (e instanceof ApiError && e.status === 401) {
+        setLoadError("Please open this app from Telegram to continue.");
+      } else {
+        setLoadError(e.message);
+      }
+    });
   }, []);
 
   const refreshBets = useCallback(() => {
@@ -50,6 +56,12 @@ export default function App() {
     api.listFights("scheduled").then(setFights).catch((e) => setLoadError(e.message));
     refreshMe();
   }, [refreshMe]);
+
+  useEffect(() => {
+    if (me && fights) {
+      setLoadError(null);
+    }
+  }, [me, fights]);
 
   useEffect(() => {
     if (activeTab === "bets") refreshBets();
