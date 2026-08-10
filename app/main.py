@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -937,6 +937,12 @@ _miniapp_dist = Path("miniapp/dist")
 _admin_dist = Path("admin/dist")
 
 if _miniapp_dist.exists():
+    @app.get("/miniapp")
+    @app.get("/miniapp/{full_path:path}")
+    async def redirect_miniapp(request: Request, full_path: str = ""):
+        target = f"/app/{full_path}" if full_path else "/app/"
+        return RedirectResponse(target, status_code=301)
+
     app.mount("/app/assets", StaticFiles(directory=_miniapp_dist / "assets"), name="miniapp-static")
 
     @app.get("/app")
