@@ -11,7 +11,7 @@ export default function JackpotAdmin() {
     fight_ids: "",
     entry_fee: "30",
     prize_pool: "1000000",
-    min_correct_to_win: "9",
+    min_correct_to_win: "10",
     deadline: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -39,8 +39,8 @@ export default function JackpotAdmin() {
     setError(null);
     try {
       const fightIds = form.fight_ids.split(",").map((s) => s.trim()).filter(Boolean);
-      if (fightIds.length !== 10) {
-        throw new Error("You must provide exactly 10 fight IDs, comma-separated.");
+      if (fightIds.length !== 11) {
+        throw new Error("You must provide exactly 11 match IDs, comma-separated.");
       }
       await adminApi.createJackpotRound({
         name: form.name,
@@ -51,7 +51,7 @@ export default function JackpotAdmin() {
         deadline: new Date(form.deadline).toISOString(),
       });
       setShowForm(false);
-      setForm({ name: "", fight_ids: "", entry_fee: "30", prize_pool: "1000000", min_correct_to_win: "9", deadline: "" });
+      setForm({ name: "", fight_ids: "", entry_fee: "30", prize_pool: "1000000", min_correct_to_win: "10", deadline: "" });
       load();
     } catch (e) {
       setError(e.message);
@@ -110,7 +110,7 @@ export default function JackpotAdmin() {
             />
           </div>
           <div style={{ marginBottom: "var(--space-2)" }}>
-              <label style={{ fontSize: 13, fontWeight: 600 }}>Fight IDs (comma-separated, exactly 10)</label>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Match IDs (comma-separated, exactly 11)</label>
             <input
               required
               value={form.fight_ids}

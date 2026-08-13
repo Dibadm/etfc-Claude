@@ -2,10 +2,10 @@
 Jackpot pool service.
 
 Rules:
-- One round is tied to exactly 10 fights.
-- Users pay an entry fee (default 30 ETB) and pick one winner per fight.
-- After all 10 fights are settled, every entry is scored.
-- Anyone with >= min_correct_to_win (default 9) correct wins a share of the prize pool.
+- One round is tied to exactly 11 matches.
+- Users pay an entry fee (default 30 ETB) and pick one winner per match.
+- After all 11 matches are settled, every entry is scored.
+- Anyone with >= min_correct_to_win (default 10) correct wins a share of the prize pool.
 """
 
 from datetime import datetime, timezone
@@ -58,15 +58,15 @@ def create_round(
     fight_ids: list[str],
     entry_fee: Decimal = Decimal("30.00"),
     prize_pool: Decimal = Decimal("1000000.00"),
-    min_correct_to_win: int = 9,
+    min_correct_to_win: int = 10,
     deadline: datetime | None = None,
 ) -> JackpotRound:
-    if len(fight_ids) != 10:
-        raise ValueError("Jackpot round must have exactly 10 fights")
+    if len(fight_ids) != 11:
+        raise ValueError("Jackpot round must have exactly 11 matches")
 
     fights = db.query(Fight).filter(Fight.id.in_(fight_ids)).all()
-    if len(fights) != 10:
-        raise ValueError("One or more fight IDs are invalid")
+    if len(fights) != 11:
+        raise ValueError("One or more match IDs are invalid")
 
     if deadline is None:
         deadline = min(f.scheduled_at for f in fights)
@@ -117,8 +117,8 @@ def submit_entry(
         db.commit()
         raise RoundNotOpenError("Entry deadline has passed")
 
-    if len(picks) != 10:
-        raise MissingPicksError("You must pick a winner for all 10 fights")
+    if len(picks) != 11:
+        raise MissingPicksError("You must pick a winner for all 11 matches")
 
     for fight_id in round_.fight_ids:
         if fight_id not in picks:

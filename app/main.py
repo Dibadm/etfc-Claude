@@ -692,11 +692,11 @@ def admin_reject_deposit_review(
 
 # --- Jackpot pool -----------------------------------------------------------
 #
-# A fixed-pool game tied to a card of 10 fights. Users pay an entry fee
-# (default 30 ETB), pick one winner per fight, and anyone with 9+ correct
+# A fixed-pool game tied to a card of 11 matches. Users pay an entry fee
+# (default 30 ETB), pick one winner per match, and anyone with 9+ correct
 # shares the prize pool (default 1M ETB). Picks lock at the deadline
-# (default: earliest fight scheduled_at). Settlement runs once after all
-# 10 fights are marked completed.
+# (default: earliest match scheduled_at). Settlement runs once after all
+# 11 matches are marked completed.
 
 @app.get("/jackpot/rounds", response_model=list[schemas.JackpotRoundOut])
 def list_jackpot_rounds(db: Session = Depends(get_db)):
